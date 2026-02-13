@@ -1,56 +1,46 @@
 # Private Voting System (Starknet + Noir + Garaga)
 
-Plug-and-play **fullstack scaffold** for private voting in DAOs, schools, and communities.
+Plug-and-play private voting backend for DAOs, schools, and communities.
 
-## Stack
-- **Noir** circuit for ZK proving logic.
-- **Cairo/Starknet** contracts for verification orchestration and election state.
-- **React + Vite + starknet.js** web app for wallet connection and vote submission.
+## What this provides
+- **Private identity**: voter identity secret stays off-chain.
+- **One person = one vote**: enforced with nullifier replay protection on-chain.
+- **Verified correctness**: proof verifier checks circuit constraints before accepting votes.
+- **Starknet-ready flow**: verifier contract + voting state contract.
 
-## Monorepo layout
-- `circuits/private_vote.nr` — Noir private voting circuit.
-- `contracts/src/private_voting.cairo` — Voting contract that calls a verifier contract.
-- `contracts/src/mock_verifier.cairo` — Local verifier stub for integration testing.
-- `contracts/src/lib.cairo` — Contract module entrypoint.
-- `Scarb.toml` — Cairo package configuration.
-- `frontend/` — Starknet frontend scaffold.
-- `docs/research-and-plan.md` — architecture notes.
-- `scripts/public_inputs_order.md` — canonical public input ordering.
+## Important implementation note
+The ZK circuit is written in **Noir (not Cairo)**.
 
-## Quickstart
+- **Noir**: proving logic (membership, nullifier, vote constraints).
+- **Cairo/Starknet**: verifier contract integration and vote state handling.
 
-### 1) Cairo contracts
-```bash
-scarb build
-```
+## Repository layout
+- `circuits/private_vote.nr`: Noir voting circuit.
+- `contracts/src/private_voting.cairo`: Starknet voting contract that consumes verifier results.
+- `docs/research-and-plan.md`: architecture notes and backend implementation guidance.
 
-### 2) Frontend
-```bash
-cd frontend
-cp .env.example .env
-npm install
-npm run dev
-```
+## High-level workflow
+1. Build Merkle tree of eligible voter commitments.
+2. User generates proof from Noir circuit with private witness.
+3. Garaga-generated verifier contract validates proof on Starknet.
+4. Voting contract:
+   - rejects used `nullifier_hash`,
+   - accepts valid proof,
+   - stores `vote_commitment`.
 
-Set `VITE_PRIVATE_VOTING_ADDRESS` in `.env` to your deployed `PrivateVoting` address.
+## Garaga verifier generation (conceptual)
+Use Garaga docs/tooling for your exact command versions.
 
-## Public input order (must match circuit + verifier)
-1. `election_id`
-2. `merkle_root`
-3. `nullifier_hash`
-4. `vote_commitment`
+Typical flow:
+1. Compile Noir circuit and generate proving artifacts.
+2. Export verification key in Garaga-compatible format.
+3. Generate Starknet verifier contract with Garaga.
+4. Deploy verifier contract.
+5. Deploy `PrivateVoting` with verifier address.
 
-## Note for dev team
-The ZK circuit is written in **Noir (not Cairo)**. Cairo is used for on-chain contracts and verifier integration.
+## Security checklist
+- Pin versions for Noir/prover/Garaga/Cairo.
+- Domain-separate hashes with `election_id`.
+- Add election timing controls and admin governance.
+- Audit hash functions and proof serialization.
 
-
-## Starknet scaffold notes
-This repository is structured as a Starknet fullstack scaffold:
-- Scarb-managed Cairo contracts in `contracts/src`.
-- React/Vite frontend in `frontend/` consuming Starknet RPC + wallet APIs.
-- Noir circuit artifacts kept separate from app runtime.
-
-Suggested next steps to complete a production scaffold:
-1. Add deployment scripts for `MockVerifier` / Garaga verifier + `PrivateVoting`.
-2. Replace `frontend/src/abi.ts` with generated ABI JSON from compiled contract artifacts.
-3. Add an indexer/relayer service to package proof calldata for users.
